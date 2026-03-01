@@ -1,7 +1,20 @@
 
+# Copyright 2026 Bill Roth
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import requests
 from bs4 import BeautifulSoup
-from bs4 import XMLParsedAsHTMLWarning
 import warnings
 import re
 import argparse
@@ -14,6 +27,11 @@ warnings.filterwarnings("ignore", category=UserWarning, module='bs4')
 
 
 def get_sitemap_urls(sitemap_url):
+    """
+    Fetches the sitemap from the provided URL.
+    If a sitemap index is detected, it recursively fetches child sitemaps.
+    Returns a list of all URLs found in the sitemap(s).
+    """
     urls = []
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
@@ -28,6 +46,7 @@ def get_sitemap_urls(sitemap_url):
         response.raise_for_status()
         soup = BeautifulSoup(response.content, "lxml-xml")
 
+        # Check if this is a sitemap index (a sitemap of sitemaps)
         if soup.find("sitemapindex"):
             print(f"Sitemap index detected: {sitemap_url}")
             for sitemap in soup.find_all("sitemap"):
@@ -35,6 +54,7 @@ def get_sitemap_urls(sitemap_url):
                 if loc:
                     urls.extend(get_sitemap_urls(loc.text.strip()))
         else:
+            # Standard sitemap, extract URLs
             for loc in soup.find_all("loc"):
                 urls.append(loc.text.strip())
     except requests.exceptions.RequestException as e:
@@ -43,6 +63,11 @@ def get_sitemap_urls(sitemap_url):
     return urls
 
 def find_contact_links(url, search_string, silent=False, search_all=False):
+    """
+    Scans a single URL for the search_string.
+    If search_all is True, searches the entire HTML text.
+    Otherwise, searches only within the href attributes of <a> tags.
+    """
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
@@ -50,20 +75,24 @@ def find_contact_links(url, search_string, silent=False, search_all=False):
     }
     try:
         response = requests.get(url, headers=headers)
+        # Skip 400-level errors (client errors) silently if requested
         if 400 <= response.status_code < 500:
             if not silent:
                 print("Skip, URL: ", url, " Status Code: ", response.status_code, file=sys.stderr)
             return False
         response.raise_for_status()
 
+        # Ensure we are processing HTML content
         if "text/html" not in response.headers.get("Content-Type", "").lower():
             return False
 
         response.encoding = response.apparent_encoding
         if search_all:
+            # Search the entire raw HTML text
             if re.search(search_string, response.text):
                 return True
         else:
+            # Parse HTML and search only in link hrefs
             soup = BeautifulSoup(response.text, "html.parser")
             for link in soup.find_all("a", href=re.compile(search_string)):
                 return True
@@ -72,6 +101,7 @@ def find_contact_links(url, search_string, silent=False, search_all=False):
     return False
 
 if __name__ == "__main__":
+    # Set up command line argument parsing
     parser = argparse.ArgumentParser(description="Find links in a sitemap.")
     parser.add_argument("sitemap_url", help="The URL of the sitemap.")
     parser.add_argument("search_string", help="The string to search for in the links.")
@@ -82,14 +112,17 @@ if __name__ == "__main__":
     
     urls = get_sitemap_urls(args.sitemap_url)
 
+    # Print status message based on search mode
     if args.all:
         print("Searching website text")
     else:
         print("Searching links in the website text")
 
+    # Initialize CSV writer
     writer = csv.writer(sys.stdout)
     writer.writerow(["Index", "URL", "Found Text"])
 
+    # Iterate through URLs and scan them
     for url in urls:
        
         if find_contact_links(url, args.search_string, args.silent, args.all):
