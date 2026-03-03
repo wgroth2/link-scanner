@@ -1,0 +1,30 @@
+graph TD
+    subgraph Client_Side [Client Side]
+        Browser[User Browser<br/>(HTML/JS Frontend)]
+    end
+
+    subgraph Server_Side [Server Side]
+        Flask[Flask Web Server<br/>(app.py)]
+        Redis[(Redis<br/>Message Broker & Result Backend)]
+        Worker[Celery Worker<br/>(tasks.py + scanner.py)]
+    end
+
+    subgraph Internet [External]
+        Target[Target Websites<br/>(Sitemaps & HTML)]
+    end
+
+    %% Flow
+    Browser -- "1. Start Scan (POST /api/scan)" --> Flask
+    Flask -- "2. Enqueue Task" --> Redis
+    Flask -. "3. Return Task ID" .-> Browser
+    
+    Redis -- "4. Distribute Task" --> Worker
+    Worker -- "5. Fetch Sitemap & Scan URLs" --> Target
+    Target -- "6. Return HTML Content" --> Worker
+    
+    Worker -- "7. Update Progress & Results" --> Redis
+    
+    Browser -- "8. Poll Status (GET /api/status)" --> Flask
+    Flask -- "9. Query Task State" --> Redis
+    Redis -- "10. Return State/Result" --> Flask
+    Flask -. "11. Return JSON Response" .-> Browser
