@@ -1,5 +1,18 @@
+import os
+import logging
 from flask import Flask, render_template, request, jsonify
-from tasks import scan_sitemap_task
+from tasks import scan_sitemap_task, app as celery_app
+
+# Configure logging to match the worker's format and shared log file
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.FileHandler("debug_app.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("Flask")
 
 app = Flask(__name__)
 
@@ -9,59 +22,43 @@ def index():
 
 @app.route('/api/scan', methods=['POST'])
 def start_scan():
-    data = request.get_json()
+    data = request.json
     sitemap_url = data.get('sitemap_url')
     search_string = data.get('search_string')
     search_all = data.get('search_all', False)
-
-    if not sitemap_url or not search_string:
-        return jsonify({'error': 'Missing required fields'}), 400
-
-    # Trigger the Celery task asynchronously
-    task = scan_sitemap_task.delay(sitemap_url, search_string, search_all)
     
+    if not sitemap_url or not search_string:
+        return jsonify({'error': 'Missing parameters'}), 400
+        
+    logger.info(f"Received scan request for: {sitemap_url}")
+    task = scan_sitemap_task.delay(sitemap_url, search_string, search_all)
     return jsonify({'task_id': task.id}), 202
 
 @app.route('/api/status/<task_id>')
-def task_status(task_id):
-    # Retrieve the task result object using the ID
-    task = scan_sitemap_task.AsyncResult(task_id)
-    
-    response = {
-        'state': task.state,
+def get_status(task_id):
+    task_result = celery_app.AsyncResult(task_id)
+    result = {
+        "state": task_result.state,
+        "status": "Processing...",
+        "percent": 0
     }
-
-    if task.state == 'PENDING':
-        # Job is waiting in the queue
-        response.update({
-            'current': 0,
-            'total': 1,
-            'status': 'Pending...',
-            'percent': 0
+    
+    if task_result.state == 'PROGRESS':
+        result.update(task_result.info)
+    elif task_result.state == 'SUCCESS':
+        result.update({
+            "status": "Complete",
+            "percent": 100,
+            "result": task_result.result
         })
-    elif task.state == 'PROGRESS':
-        # Job is running, return metadata set by self.update_state() in tasks.py
-        response.update({
-            'current': task.info.get('current', 0),
-            'total': task.info.get('total', 1),
-            'status': task.info.get('status', ''),
-            'percent': task.info.get('percent', 0)
+    elif task_result.state == 'FAILURE':
+        result.update({
+            "status": "Error",
+            "error": str(task_result.info)
         })
-    elif task.state == 'SUCCESS':
-        # Job finished successfully
-        response.update({
-            'status': 'Scan Complete!',
-            'percent': 100,
-            'result': task.result  # This contains the dict returned by the task
-        })
-    else:
-        # FAILURE, REVOKED, etc.
-        response.update({
-            'status': 'Error occurred',
-            'error': str(task.info)
-        })
-
-    return jsonify(response)
+        
+    return jsonify(result)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Use a different port if 5000 is occupied (common on macOS)
+    app.run(debug=True, port=5001)

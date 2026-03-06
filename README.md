@@ -41,41 +41,93 @@ README.md
 
 ## Setup
 
-To run the application, you need to start three separate components:
+Use the provided run script to start all three components (Redis, Celery worker, Flask) in one command:
 
-1. **Redis Server**: Ensure Redis is running. You can start it manually via the command line:
+```bash
+./run.sh
+```
+
+All output is sent to syslog under the tag `link-scanner`. To tail logs:
+
+```bash
+# macOS
+log stream --predicate 'senderImagePath contains "logger"' --info | grep "link-scanner"
+
+# Ubuntu
+journalctl -f -t "link-scanner"
+```
+
+## Stopping the Application
+
+Press `Ctrl+C` in the terminal running `run.sh`. This will cleanly shut down all three processes.
+
+## Manual Setup (Alternative)
+
+If you prefer to run each component separately:
+
+1. **Redis Server**:
    ```bash
    redis-server
    ```
 
 2. **Celery Worker**:
-   In a new terminal, activate the environment and start the worker:
    ```bash
-   source venv/bin/activate
+   source .venv/bin/activate
    celery -A tasks worker --loglevel=info
    ```
+
 3. **Flask App**:
-   In another terminal, activate the environment and start the web server:
    ```bash
-   source venv/bin/activate
+   source .venv/bin/activate
    python3 app.py
    ```
 
-## Stopping the Application
+## Command Line Usage (scanner.py)
 
-1. **Stop Flask & Celery**:
-   Simply press `Ctrl+C` in the terminal windows where they are running.
+`scanner.py` can be run directly from the command line to scan a sitemap for a search string.
 
-2. **Stop Redis**:
-   *   If started via Homebrew Services:
-       ```bash
-       brew services stop redis
-       ```
-   *   If started directly (`redis-server`):
-       *   Foreground: Press `Ctrl+C`.
-       *   Background:
-           ```bash
-           redis-cli shutdown
-           ```
+```
+python3 scanner.py <sitemap_url> <search_string> [options]
+```
+### Comment about search strings
+
+<Search_string> can be a regular expression.
+### Positional Arguments
+
+| Argument | Description |
+|---|---|
+| `sitemap_url` | The URL of the sitemap to scan (e.g. `https://example.com/sitemap.xml`) |
+| `search_string` | The string (or regex) to search for |
+
+### Options
+
+| Flag | Description |
+|---|---|
+| `-s`, `--silent` | Suppress "skip" messages for 4xx HTTP errors |
+| `-a`, `--all` | Search the entire HTML source text instead of only `<a href>` attributes |
+| `-t`, `--timeout <seconds>` | Request timeout in seconds (default: 10) |
+| `-d`, `--debug` | Enable debug logging to stdout |
+| `-u`, `--url` | Print each URL as it is being scanned |
+
+### Output
+
+Results are written to stdout as CSV with columns: `Index`, `URL`, `Found Text`.
+
+### Examples
+
+Search all page links for `mailto:`:
+```bash
+python3 scanner.py https://example.com/sitemap.xml "mailto:"
+```
+
+Search full HTML source for a phone number pattern, with debug output:
+```bash
+python3 scanner.py https://example.com/sitemap.xml "\d{3}-\d{4}" --all --debug
+```
+
+Redirect results to a file:
+```bash
+python3 scanner.py https://example.com/sitemap.xml "contact" -s > results.csv
+```
 
 ## Notes
