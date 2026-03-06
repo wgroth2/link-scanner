@@ -1,0 +1,23 @@
+# IDE / tools
+.vscode/launch.json
+.gemini/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+venv
+.venv/
+
+# Redis
+dump.rdb
+redis.log
+
+# Logs
+*.log
+
+# Temp
+tmp/

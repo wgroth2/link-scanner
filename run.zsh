@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # Copyright 2026 Bill Roth
 #
@@ -29,7 +29,7 @@ cleanup() {
     kill $REDIS_PID $CELERY_PID $FLASK_PID 2>/dev/null
     exit 0
 }
-trap cleanup SIGINT SIGTERM
+trap cleanup INT TERM
 
 # Start Redis
 echo "Starting Redis..."
@@ -53,5 +53,6 @@ FLASK_PID=$!
 
 echo ""
 echo "All services running. Logs going to syslog. Press Ctrl+C to stop."
-echo "  tail with: journalctl -f -t link-scanner"
+echo "  tail with: log stream --predicate 'senderImagePath contains \"logger\"' --info"
+
 wait
