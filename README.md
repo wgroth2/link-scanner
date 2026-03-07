@@ -18,9 +18,9 @@ README.md
 
 3. **Install Python Dependencies**:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install flask celery[redis] requests beautifulsoup4 lxml
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
    ```
 
 ## Installation: Ubuntu
@@ -34,9 +34,9 @@ README.md
 
 2. **Setup Python Virtual Environment**:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activatere
-   pip install flask celery[redis] requests beautifulsoup4 lxml
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
    ```
 
 ## Setup

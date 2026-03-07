@@ -1,3 +1,18 @@
+<!--
+Copyright 2026 Bill Roth
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,13 +23,13 @@
         Contains meta tags to prevent caching so users always see fresh content, and imports Bootstrap CSS.
     -->
     <title>Website String Search</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        .progress { height: 25px; }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/static/style.css" rel="stylesheet">
 </head>
 <body class="bg-light">
 
@@ -41,7 +56,9 @@
                             <input type="url" class="form-control" id="sitemapUrl" value="https://healymarketinggroup.com/sitemap.xml" placeholder="https://example.com/sitemap.xml" required>
                         </div>
                         <div class="mb-3">
-                            <label for="searchString" class="form-label">Search String</label>
+                            <label for="searchString" class="form-label">Search String
+                                <i class="bi bi-info-circle text-secondary ms-1" data-bs-toggle="tooltip" data-bs-placement="right" title="String is case sensitive, and regular expressions can be used."></i>
+                            </label>
                             <input type="text" class="form-control" id="searchString" value="Microsoft" placeholder="e.g., contact" required>
                         </div>
                         <div class="mb-3 form-check">
@@ -88,6 +105,17 @@
                             </tbody>
                         </table>
                     </div>
+                    <p class="text-muted small mt-3 mb-0">Scan completed in <span id="elapsedTime">0</span></p>
+                    <div id="timeoutSection" class="d-none mt-3">
+                        <div class="alert alert-warning mb-2">
+                            <strong>Pages that timed out (<span id="timeoutCount">0</span>):</strong> These pages did not respond in time and were not scanned.
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered">
+                                <tbody id="timeoutTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -101,6 +129,7 @@
 <footer class="py-4 text-center text-muted">
     <div class="container">
         <p>&copy; 2026 <a href="https://billroth.net" target="_blank">Bill Roth</a></p>
+        <p class="small mb-0">Last Updated: {{ last_updated }}</p>
     </div>
 </footer>
 
@@ -123,6 +152,9 @@
         document.getElementById('progressBar').style.width = '0%';
         document.getElementById('progressBar').innerText = '0%';
         document.getElementById('resultsTableBody').innerHTML = '';
+        document.getElementById('timeoutSection').classList.add('d-none');
+        document.getElementById('timeoutTableBody').innerHTML = '';
+        window._scanStartTime = Date.now();
 
         const sitemapUrl = document.getElementById('sitemapUrl').value;
         const searchString = document.getElementById('searchString').value;
@@ -140,6 +172,8 @@
             if (data.error) throw new Error(data.error);
             
             const taskId = data.task_id;
+            localStorage.setItem('activeTaskId', taskId);
+            localStorage.setItem('scanStartTime', window._scanStartTime);
             pollStatus(taskId);
 
         } catch (error) {
@@ -161,6 +195,10 @@
         document.getElementById('progressBar').innerText = data.percent + '%';
 
         if (data.state === 'SUCCESS') {
+            localStorage.removeItem('activeTaskId');
+            localStorage.removeItem('scanStartTime');
+            const elapsed = ((Date.now() - window._scanStartTime) / 1000).toFixed(1);
+            document.getElementById('elapsedTime').innerText = elapsed + 's';
             document.getElementById('scanBtn').disabled = false;
             document.getElementById('resultsSection').classList.remove('d-none');
             document.getElementById('totalScanned').innerText = data.result.total_scanned;
@@ -170,12 +208,40 @@
             data.result.urls.forEach((url, index) => {
                 tbody.innerHTML += `<tr><td>${index + 1}</td><td><a href="${url}" target="_blank">${url}</a></td></tr>`;
             });
+
+            const timedOut = data.result.timed_out || [];
+            if (timedOut.length > 0) {
+                document.getElementById('timeoutSection').classList.remove('d-none');
+                document.getElementById('timeoutCount').innerText = timedOut.length;
+                const timeoutTbody = document.getElementById('timeoutTableBody');
+                timedOut.forEach(url => {
+                    timeoutTbody.innerHTML += `<tr><td><a href="${url}" target="_blank">${url}</a></td></tr>`;
+                });
+            }
         } else if (data.state === 'FAILURE' || data.state === 'REVOKED') {
+            localStorage.removeItem('activeTaskId');
+            localStorage.removeItem('scanStartTime');
             showError(data.error || 'An unknown error occurred.');
         } else {
-            setTimeout(() => pollStatus(taskId), 2000);
+            setTimeout(() => pollStatus(taskId), 5000);
         }
     }
+
+    /*
+        PAGE LOAD HANDLER:
+        On reload, check localStorage for an in-progress task and resume polling if found.
+    */
+    window.addEventListener('DOMContentLoaded', function() {
+        const savedTaskId = localStorage.getItem('activeTaskId');
+        if (savedTaskId) {
+            const savedStartTime = localStorage.getItem('scanStartTime');
+            window._scanStartTime = savedStartTime ? parseInt(savedStartTime) : Date.now();
+            document.getElementById('progressSection').classList.remove('d-none');
+            document.getElementById('scanBtn').disabled = true;
+            document.getElementById('statusText').innerText = 'Reconnecting to scan...';
+            pollStatus(savedTaskId);
+        }
+    });
 
     /*
         ERROR HANDLER:
@@ -187,6 +253,10 @@
         alert.classList.remove('d-none');
         document.getElementById('scanBtn').disabled = false;
     }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
 </script>
 </body>
 </html>

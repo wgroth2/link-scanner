@@ -60,6 +60,7 @@ def scan_sitemap_task(self, sitemap_url, search_string, search_all=False):
 
     total = len(urls)
     results = []
+    timed_out = []
 
     # 2. Iterate and Scan
     for i, url in enumerate(urls):
@@ -72,17 +73,22 @@ def scan_sitemap_task(self, sitemap_url, search_string, search_all=False):
                 'status': f'Scanning {i}/{total} URLs...',
                 'percent': int((i / total) * 100) if total > 0 else 0
             })
-        
+
         # Run the check using the existing function
         # silent=True prevents printing "Skip" messages to the worker logs
-        if find_contact_links(url, search_string, silent=True, search_all=search_all):
+        # Returns None on timeout, False if not found, True if found
+        result = find_contact_links(url, search_string, silent=True, search_all=search_all)
+        if result is None:
+            timed_out.append(url)
+        elif result:
             results.append(url)
 
     # 3. Return Results
     # The return value is serialized and stored in Redis as the task result.
-    logger.info(f"Task complete. Found {len(results)} matches.")
+    logger.info(f"Task complete. Found {len(results)} matches. {len(timed_out)} timeouts.")
     return {
         'total_scanned': total,
         'matches_found': len(results),
-        'urls': results
+        'urls': results,
+        'timed_out': timed_out
     }

@@ -110,7 +110,8 @@ def find_contact_links(url, search_string, silent=False, search_all=False, timeo
             for link in soup.find_all("a", href=re.compile(search_string)):
                 return True
     except requests.exceptions.Timeout:
-        print(f"Timeout fetching {url}")
+        logger.warning(f"Timeout fetching {url}")
+        return None
     except requests.exceptions.RequestException as e:
         logger.error(f"Error fetching {url}: {e}")
     except KeyboardInterrupt:

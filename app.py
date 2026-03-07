@@ -15,6 +15,7 @@
 
 import os
 import logging
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify
 from tasks import scan_sitemap_task, app as celery_app
 
@@ -33,7 +34,10 @@ app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    template_path = os.path.join(app.root_path, 'templates', 'index.html')
+    mtime = os.path.getmtime(template_path)
+    last_updated = datetime.fromtimestamp(mtime).astimezone().strftime('%B %-d, %Y %-I:%M %p %Z')
+    return render_template('index.html', last_updated=last_updated)
 
 @app.route('/api/scan', methods=['POST'])
 def start_scan():
@@ -75,5 +79,9 @@ def get_status(task_id):
     return jsonify(result)
 
 if __name__ == '__main__':
-    # Use a different port if 5000 is occupied (common on macOS)
-    app.run(debug=True, port=5001)
+    # use_reloader=False prevents conflicts with the VSCode debugger (debugpy).
+    # To reload after changes when debugging, use the restart button in VSCode.
+    # The reloader is still active when running via run.sh / run.zsh directly.
+    import sys
+    use_reloader = sys.gettrace() is None  # False when debugger is attached
+    app.run(debug=True, port=5001, use_reloader=use_reloader)

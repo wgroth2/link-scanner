@@ -21,3 +21,6 @@ redis.log
 
 # Temp
 tmp/
+
+# Old
+old/
