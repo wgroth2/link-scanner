@@ -16,7 +16,7 @@
 import os
 import logging
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from tasks import scan_sitemap_task, app as celery_app
 
 # Configure logging to match the worker's format and shared log file
@@ -38,6 +38,10 @@ def index():
     mtime = os.path.getmtime(template_path)
     last_updated = datetime.fromtimestamp(mtime).astimezone().strftime('%B %-d, %Y %-I:%M %p %Z')
     return render_template('index.html', last_updated=last_updated)
+
+@app.route('/robots.txt')
+def robots():
+    return send_from_directory(app.static_folder, 'robots.txt')
 
 @app.route('/api/scan', methods=['POST'])
 def start_scan():
