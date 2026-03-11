@@ -186,7 +186,14 @@ limitations under the License.
 <footer class="py-4 text-center text-muted">
     <div class="container">
         <p>&copy; 2026 <a href="https://opzdk.share-na2.hsforms.com/2JUJqFSTrQ5C0YwI6-XCVWg" target="_blank">Bill Roth</a></p>
-        <p class="small mb-0">Last Updated: {{ last_updated }}</p>
+        <p class="small mb-0">Last Updated: <span id="last-updated"></span></p>
+        <script>
+            const ts = {{ last_updated_ts }} * 1000; // jinja2 template variable
+            document.getElementById('last-updated').textContent = new Date(ts).toLocaleString(undefined, {
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+            });
+        </script>
     </div>
 </footer>
 

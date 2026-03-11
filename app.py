@@ -36,8 +36,7 @@ app = Flask(__name__)
 def index():
     template_path = os.path.join(app.root_path, 'templates', 'index.html')
     mtime = os.path.getmtime(template_path)
-    last_updated = datetime.fromtimestamp(mtime).astimezone().strftime('%B %-d, %Y %-I:%M %p %Z')
-    return render_template('index.html', last_updated=last_updated)
+    return render_template('index.html', last_updated_ts=int(mtime))
 
 @app.route('/robots.txt')
 def robots():
