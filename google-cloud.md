@@ -18,9 +18,21 @@ In your DNS provider (wherever `websitestringsearch.com` is registered), add an 
 
 ## 3. SSH into the VM and install dependencies
 
+On a raw Ubuntu server (no desktop), install the following packages:
+
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y python3-pip python3-venv redis-server nginx certbot python3-certbot-nginx git
+sudo apt install -y \
+    python3 \
+    python-is-python3 \
+    python3-pip \
+    python3.12-venv \
+    redis \
+    nginx \
+    certbot \
+    python3-certbot-nginx \
+    git \
+    vim
 ```
 
 ---
@@ -88,11 +100,15 @@ sudo systemctl start redis celery gunicorn
 
 ## 6. Configure Nginx as a reverse proxy
 
+If your domain is not set up yet, you can use the VM's external IP address for `server_name` and test over HTTP. Skip Certbot until the domain is pointed at the IP and DNS has propagated.
+
 Create `/etc/nginx/sites-available/link-scanner`:
 
 ```nginx
 server {
     server_name websitestringsearch.com www.websitestringsearch.com;
+    # If domain is not set up yet, use the external IP instead:
+    # server_name 34.123.45.67;
 
     location / {
         proxy_pass http://127.0.0.1:5001;
@@ -105,8 +121,13 @@ server {
 Enable it:
 
 ```bash
+# Activate the config by linking it into sites-enabled
 sudo ln -s /etc/nginx/sites-available/link-scanner /etc/nginx/sites-enabled/
+
+# Test the Nginx config for syntax errors before applying
 sudo nginx -t
+
+# Restart Nginx to apply the new config
 sudo systemctl restart nginx
 ```
 
