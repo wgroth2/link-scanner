@@ -85,7 +85,7 @@ limitations under the License.
 </head>
 <body class="bg-light">
 
-    <!-- Google Tag Manager (noscript) -->
+    <!-- Google Tag Manager (noscript) -->  
     <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5T86DNPL"
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
@@ -187,9 +187,10 @@ limitations under the License.
 -->
 <footer class="py-4 text-center text-muted">
     <div class="container">
-        <p>&copy; 2026 <a href="https://opzdk.share-na2.hsforms.com/2JUJqFSTrQ5C0YwI6-XCVWg" target="_blank">Bill Roth</a></p>
+        <p>&copy; <span id="copyright-year"></span> <a href="https://opzdk.share-na2.hsforms.com/2JUJqFSTrQ5C0YwI6-XCVWg" target="_blank">Bill Roth</a></p>
         <p class="small mb-0">Last Updated: <span id="last-updated"></span></p>
         <script>
+            document.getElementById('copyright-year').textContent = new Date().getFullYear();
             const ts = {{ last_updated_ts }} * 1000; // jinja2 template variable
             document.getElementById('last-updated').textContent = new Date(ts).toLocaleString(undefined, {
                 year: 'numeric', month: 'long', day: 'numeric',

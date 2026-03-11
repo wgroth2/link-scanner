@@ -55,8 +55,8 @@ def start_scan():
     
     if not sitemap_url or not search_string:
         return jsonify({'error': 'Missing parameters'}), 400
-        
-    logger.info(f"Received scan request for: {sitemap_url}")
+
+    logger.info(f"Scan submitted — sitemap: {sitemap_url}, string: '{search_string}'")
     task = scan_sitemap_task.delay(sitemap_url, search_string, search_all)
     return jsonify({'task_id': task.id}), 202
 
