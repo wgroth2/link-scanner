@@ -1,0 +1,13 @@
+[Unit]
+Description=Flower Celery Monitor
+After=network.target redis.service celery.service
+
+[Service]
+User=bill_roth
+WorkingDirectory=/home/bill_roth/link-scanner
+ExecStart=/home/bill_roth/link-scanner/.venv/bin/celery -A tasks flower --port=5555 --url-prefix=flower
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
