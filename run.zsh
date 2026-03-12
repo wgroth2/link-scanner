@@ -18,6 +18,11 @@
 # Activate virtual environment
 source .venv/bin/activate
 
+# Default form field values — only set if not already defined in the environment
+: ${DEFAULT_SITEMAP_URL:=https://digiroth.com/sitemap.xml}
+: ${DEFAULT_SEARCH_STRING:=SEO}
+export DEFAULT_SITEMAP_URL DEFAULT_SEARCH_STRING
+
 # Check for already-running services
 ABORT=0
 if lsof -i :6379 -sTCP:LISTEN -t &>/dev/null; then

@@ -14,6 +14,7 @@
 
 
 import os
+import re
 import logging
 from celery import Celery
 # Import the logic from your existing scanner.py.
@@ -48,11 +49,17 @@ def scan_sitemap_task(self, sitemap_url, search_string, search_all=False):
     """
     # 1. Update state: Starting (SENDING DATA TO REDIS)
     # self.update_state() sends a message to Redis so the frontend can poll the status.
+    # Secondary guard against regex injection in case the pattern bypasses the API validation.
+    # Raises ValueError to fail the task cleanly rather than crashing the worker process.
+    try:
+        re.compile(search_string)
+    except re.error as e:
+        raise ValueError(f"Invalid regex pattern: {e}")
+
     logger.info(f"Starting task for sitemap: {sitemap_url}")
     self.update_state(state='PROGRESS', meta={'status': 'Fetching sitemap...', 'current': 0, 'total': 0})
     
     # Reuse the logic from scanner.py to get the list of URLs
-    # Note: This function prints to stdout, which will appear in your worker logs.
     urls = get_sitemap_urls(sitemap_url)
     if urls is None:
         logger.error(f"Task failed: {sitemap_url} is not a valid sitemap.")

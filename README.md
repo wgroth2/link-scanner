@@ -130,7 +130,51 @@ Redirect results to a file:
 python3 scanner.py https://example.com/sitemap.xml "contact" -s > results.csv
 ```
 
+## Architcture
+
+```mermaid
+graph TD
+    subgraph Client_Side [Client Side]
+        Browser[User Browser<br/>(HTML/JS Frontend)]
+    end
+
+    subgraph Server_Side [Server Side]
+        Flask[Flask Web Server<br/>(app.py)]
+        Redis[(Redis<br/>Message Broker & Result Backend)]
+        Worker[Celery Worker<br/>(tasks.py + scanner.py)]
+    end
+
+    subgraph Internet [External]
+        Target[Target Websites<br/>(Sitemaps & HTML)]
+    end
+
+    %% Flow
+    Browser -- "1. Start Scan (POST /api/scan)" --> Flask
+    Flask -- "2. Enqueue Task" --> Redis
+    Flask -. "3. Return Task ID" .-> Browser
+    
+    Redis -- "4. Distribute Task" --> Worker
+    Worker -- "5. Fetch Sitemap & Scan URLs" --> Target
+    Target -- "6. Return HTML Content" --> Worker
+    
+    Worker -- "7. Update Progress & Results" --> Redis
+    
+    Browser -- "8. Poll Status (GET /api/status)" --> Flask
+    Flask -- "9. Query Task State" --> Redis
+    Redis -- "10. Return State/Result" --> Flask
+    Flask -. "11. Return JSON Response" .-> Browser
+
+```
 ## Notes
+
+### Issues Worth Addressing
+
+1. **Regex injection risk** (`scanner.py`) — raw user input is passed directly to `re.search()` with no validation; malformed patterns (e.g. unbalanced parentheses) can crash Celery workers.
+2. **Hardcoded test values** (`templates/index.html`) — default form values point to `healymarketinggroup.com` / `Microsoft`; should be cleared or replaced with placeholder examples.
+3. **No Celery task timeout** (`tasks.py`) — long-running scans can hang indefinitely; no `time_limit` or `soft_time_limit` configured on the task.
+4. **No rate limiting** (`scanner.py`) — requests to target sites are made without throttling, which may trigger rate limits or IP blocks on large sitemaps.
+5. **Unused variable** (`scanner.py:142`) — `x=1` is initialized outside the `if __name__` block; should be moved inside for clarity.
+6. **Silent failure on non-HTML content** (`scanner.py`) — returns `False` without logging when the response `Content-Type` is not HTML, making it hard to distinguish from "not found".
 
 ---
 

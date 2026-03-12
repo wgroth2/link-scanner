@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+import re
 import logging
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_from_directory
@@ -36,7 +37,11 @@ app = Flask(__name__)
 def index():
     template_path = os.path.join(app.root_path, 'templates', 'index.html')
     mtime = os.path.getmtime(template_path)
-    return render_template('index.html', last_updated_ts=int(mtime))
+    return render_template('index.html',
+        last_updated_ts=int(mtime),
+        default_sitemap_url=os.environ.get('DEFAULT_SITEMAP_URL') or 'https://digiroth.com/sitemap.xml',
+        default_search_string=os.environ.get('DEFAULT_SEARCH_STRING') or 'SEO',
+    )
 
 @app.route('/robots.txt')
 def robots():
@@ -55,6 +60,13 @@ def start_scan():
     
     if not sitemap_url or not search_string:
         return jsonify({'error': 'Missing parameters'}), 400
+
+    # Guard against regex injection: validate the pattern before queuing the task.
+    # A malformed regex (e.g. unbalanced parentheses) would otherwise crash the Celery worker.
+    try:
+        re.compile(search_string)
+    except re.error as e:
+        return jsonify({'error': f'Invalid regex pattern: {e}'}), 400
 
     logger.info(f"Scan submitted — sitemap: {sitemap_url}, string: '{search_string}'")
     task = scan_sitemap_task.delay(sitemap_url, search_string, search_all)

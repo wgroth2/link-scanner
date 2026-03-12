@@ -139,8 +139,15 @@ if __name__ == "__main__":
         stream=sys.stdout
     )
 
-    x=1
-    
+    # Guard against regex injection: validate the pattern before scanning.
+    # Exits with an error message rather than crashing mid-scan on a malformed pattern.
+    try:
+        re.compile(args.search_string)
+    except re.error as e:
+        print(f"Error: Invalid regex pattern: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    x = 1
     urls = get_sitemap_urls(args.sitemap_url, timeout=args.timeout)
 
     if urls is None:

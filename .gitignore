@@ -25,3 +25,7 @@ tmp/
 # Old
 old/
 .vscode/settings.json
+CLAUDE.md
+
+marketing/
+.vscode/
