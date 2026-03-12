@@ -276,6 +276,16 @@ limitations under the License.
                 tbody.innerHTML += `<tr><td>${index + 1}</td><td><a href="${url}" target="_blank">${url}</a></td></tr>`;
             });
 
+            // GA4 conversion event: fire when at least one match is found
+            if (data.result.matches_found > 0) {
+                window.dataLayer = window.dataLayer || [];
+                window.dataLayer.push({
+                    event: 'scan_conversion',
+                    matches_found: data.result.matches_found,
+                    sitemap_url: sitemapUrl
+                });
+            }
+
             const timedOut = data.result.timed_out || [];
             if (timedOut.length > 0) {
                 document.getElementById('timeoutSection').classList.remove('d-none');
