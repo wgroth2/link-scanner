@@ -153,8 +153,96 @@ Your site should then be live at `https://websitestringsearch.com`.
 
 ---
 
+---
+
+## 9. Optionally expose Flower through Nginx (with auth)
+
+Flower has no built-in authentication. If you want to access it in production, proxy it through Nginx with HTTP basic auth.
+
+### Create a password file
+
+```bash
+sudo apt install apache2-utils   # provides htpasswd
+sudo htpasswd -c /etc/nginx/.htpasswd admin
+```
+
+### Add a systemd service for Flower
+
+Create `/etc/systemd/system/flower.service`:
+
+```ini
+[Unit]
+Description=Flower Celery Monitor
+After=network.target redis.service celery.service
+
+[Service]
+User=www-data
+WorkingDirectory=/home/YOUR_USER/link-scanner
+ExecStart=/home/YOUR_USER/link-scanner/.venv/bin/celery -A tasks flower --port=5555 --url-prefix=flower
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start it:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable flower
+sudo systemctl start flower
+```
+
+### Update Nginx config
+
+Add the `location /flower/` block to the `443` server block only (the `80` block just redirects to HTTPS and needs no change):
+
+```nginx
+server {
+    listen 80;
+    server_name websitestringsearch.com www.websitestringsearch.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name websitestringsearch.com www.websitestringsearch.com;
+
+    ssl_certificate /etc/letsencrypt/live/websitestringsearch.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/websitestringsearch.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:5001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /flower/ {
+        proxy_pass http://127.0.0.1:5555/flower/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_redirect off;
+
+        auth_basic "Flower";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+    }
+}
+```
+
+Reload Nginx:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Flower will be accessible at `https://websitestringsearch.com/flower/` behind a login prompt.
+
+---
+
 ## Notes
 
 - Replace `YOUR_USER` in the systemd service files with your actual Linux username on the VM.
 - `gunicorn` is not in `requirements.txt` — install it separately with `pip install gunicorn`.
-- Flower is not included in the production setup. It is a development/monitoring tool and should not be exposed publicly.
+- Flower is optional in production. If exposed, always protect it with `auth_basic` as shown above.
