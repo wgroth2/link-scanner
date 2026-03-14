@@ -32,7 +32,9 @@ sudo apt install -y \
     certbot \
     python3-certbot-nginx \
     git \
-    vim
+    vim \
+    apache2-utils
+    
 ```
 
 ---

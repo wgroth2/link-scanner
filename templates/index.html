@@ -236,16 +236,33 @@ limitations under the License.
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sitemap_url: sitemapUrl, search_string: searchString, search_all: searchAll })
             });
+            if (!response.ok) {
+                console.error(`[scan] /api/scan returned HTTP ${response.status} ${response.statusText}`);
+            }
             const data = await response.json();
-            
-            if (data.error) throw new Error(data.error);
-            
+
+            if (data.error) {
+                console.error('[scan] Server error starting scan:', data.error);
+                throw new Error(data.error);
+            }
+
             const taskId = data.task_id;
+            console.log('[scan] Task started:', taskId);
             localStorage.setItem('activeTaskId', taskId);
             localStorage.setItem('scanStartTime', window._scanStartTime);
-            pollStatus(taskId);
+
+            // GA4 event: fire on every scan submission
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                event: 'scan_conversion',
+                sitemap_url: sitemapUrl
+            });
+            console.log('[ga4] scan_conversion event pushed to dataLayer');
+
+            pollStatus(taskId, sitemapUrl);
 
         } catch (error) {
+            console.error('[scan] Failed to start scan:', error);
             showError(error.message);
         }
     });
@@ -255,15 +272,26 @@ limitations under the License.
         Recursively checks the task status every 2 seconds.
         Updates the progress bar and renders the results table when the task succeeds.
     */
-    async function pollStatus(taskId) {
-        const response = await fetch(`/api/status/${taskId}`);
-        const data = await response.json();
+    async function pollStatus(taskId, sitemapUrl) {
+        let response, data;
+        try {
+            response = await fetch(`/api/status/${taskId}`);
+            if (!response.ok) {
+                console.error(`[poll] /api/status/${taskId} returned HTTP ${response.status} ${response.statusText}`);
+            }
+            data = await response.json();
+        } catch (error) {
+            console.error('[poll] Network error fetching task status:', error);
+            showError('Lost connection to the server. Please refresh and try again.');
+            return;
+        }
 
         document.getElementById('statusText').innerText = data.status;
         document.getElementById('progressBar').style.width = data.percent + '%';
         document.getElementById('progressBar').innerText = data.percent + '%';
 
         if (data.state === 'SUCCESS') {
+            console.log('[poll] Scan complete. Matches:', data.result.matches_found, '/ Scanned:', data.result.total_scanned);
             localStorage.removeItem('activeTaskId');
             localStorage.removeItem('scanStartTime');
             const elapsed = ((Date.now() - window._scanStartTime) / 1000).toFixed(1);
@@ -278,18 +306,9 @@ limitations under the License.
                 tbody.innerHTML += `<tr><td>${index + 1}</td><td><a href="${url}" target="_blank">${url}</a></td></tr>`;
             });
 
-            // GA4 conversion event: fire when at least one match is found
-            if (data.result.matches_found > 0) {
-                window.dataLayer = window.dataLayer || [];
-                window.dataLayer.push({
-                    event: 'scan_conversion',
-                    matches_found: data.result.matches_found,
-                    sitemap_url: sitemapUrl
-                });
-            }
-
             const timedOut = data.result.timed_out || [];
             if (timedOut.length > 0) {
+                console.warn('[poll] Timed-out pages:', timedOut.length, timedOut);
                 document.getElementById('timeoutSection').classList.remove('d-none');
                 document.getElementById('timeoutCount').innerText = timedOut.length;
                 const timeoutTbody = document.getElementById('timeoutTableBody');
@@ -298,11 +317,12 @@ limitations under the License.
                 });
             }
         } else if (data.state === 'FAILURE' || data.state === 'REVOKED') {
+            console.error(`[poll] Task ${data.state}:`, data.error || 'no error detail returned');
             localStorage.removeItem('activeTaskId');
             localStorage.removeItem('scanStartTime');
             showError(data.error || 'An unknown error occurred.');
         } else {
-            setTimeout(() => pollStatus(taskId), 5000);
+            setTimeout(() => pollStatus(taskId, sitemapUrl), 5000);
         }
     }
 
@@ -322,7 +342,7 @@ limitations under the License.
             document.getElementById('progressSection').classList.remove('d-none');
             document.getElementById('scanBtn').disabled = true;
             document.getElementById('statusText').innerText = 'Reconnecting to scan...';
-            pollStatus(savedTaskId);
+            pollStatus(savedTaskId, null);
         }
     });
 
@@ -331,6 +351,7 @@ limitations under the License.
         Displays error messages in the alert box and re-enables the submit button.
     */
     function showError(msg) {
+        console.error('[error] Displayed to user:', msg);
         const alert = document.getElementById('errorAlert');
         alert.innerText = msg;
         alert.classList.remove('d-none');
