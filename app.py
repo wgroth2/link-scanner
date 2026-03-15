@@ -51,6 +51,10 @@ def robots():
 def sitemap():
     return send_from_directory(app.static_folder, 'sitemap.xml')
 
+@app.route('/ads.txt')
+def ads_txt():
+    return send_from_directory(app.static_folder, 'ads.txt')
+
 @app.route('/api/scan', methods=['POST'])
 def start_scan():
     data = request.json
