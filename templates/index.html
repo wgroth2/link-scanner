@@ -100,7 +100,7 @@ limitations under the License.
         <div class="col-md-8">
             <div class="card shadow">
                 <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0">Sitemap Link Scanner</h3>
+                    <h3 class="mb-0">Website String Search</h3>
                 </div>
                 <div class="card-body">
                     <!-- 
@@ -108,11 +108,17 @@ limitations under the License.
                         Collects the Sitemap URL and the string to search for.
                     -->
                     <form id="scanForm">
+                        <div class="mb-3 text-end">
+                            <a href="#" id="tryExampleBtn" class="small">Try an example →</a>
+                        </div>
                         <div class="mb-3">
                             <label for="sitemapUrl" class="form-label">Sitemap URL
-                                <i class="bi bi-info-circle text-secondary ms-1" data-bs-toggle="tooltip" data-bs-placement="right" title="This field is the url of the sitemap to crawl. It has to be the exact url otherwise the app will not work."></i>
+                                <i class="bi bi-info-circle text-secondary ms-1" data-bs-toggle="tooltip" data-bs-placement="right" title="Usually found at example.com/sitemap.xml or example.com/sitemap_index.xml"></i>
                             </label>
                             <input type="url" class="form-control" id="sitemapUrl" value="{{ default_sitemap_url }}" placeholder="https://example.com/sitemap.xml" required>
+                            <div id="sitemapHint" class="form-text text-warning d-none">
+                                Tip: try appending <a href="#" id="sitemapHintAppend" class="text-warning">/sitemap.xml</a> or <a href="#" id="sitemapHintAppendIndex" class="text-warning">/sitemap_index.xml</a>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label for="searchString" class="form-label">Search String
@@ -122,11 +128,11 @@ limitations under the License.
                         </div>
                         <div class="mb-3 form-check">
                             <input type="checkbox" class="form-check-input" id="searchAll">
-                            <label class="form-check-label" for="searchAll">Search entire HTML content (slower)
-                                <i class="bi bi-info-circle text-secondary ms-1" data-bs-toggle="tooltip" data-bs-placement="right" title="If this is unchecked, it will only scan the URLs in the html. If it is checked, it will scan the whole html file."></i>
+                            <label class="form-check-label" for="searchAll">Search full page text, not just links
+                                <i class="bi bi-info-circle text-secondary ms-1" data-bs-toggle="tooltip" data-bs-placement="right" title="Unchecked: scans only link URLs on each page. Checked: scans all visible text and HTML content."></i>
                             </label>
                         </div>
-                        <button type="submit" class="btn btn-primary w-100" id="scanBtn">Start Scan</button>
+                        <button type="submit" class="btn btn-primary w-100" id="scanBtn">Scan Now</button>
                     </form>
 
                     <!-- 
@@ -210,6 +216,36 @@ limitations under the License.
         3. Sends a POST request to the Flask backend to start the Celery task.
         4. Initiates the polling loop with the returned Task ID.
     */
+    const sitemapInput = document.getElementById('sitemapUrl');
+    const sitemapHint = document.getElementById('sitemapHint');
+
+    sitemapInput.addEventListener('blur', function() {
+        const val = this.value.trim();
+        if (val && !val.endsWith('.xml')) {
+            sitemapHint.classList.remove('d-none');
+        } else {
+            sitemapHint.classList.add('d-none');
+        }
+    });
+
+    document.getElementById('sitemapHintAppend').addEventListener('click', function(e) {
+        e.preventDefault();
+        sitemapInput.value = sitemapInput.value.replace(/\/?$/, '/sitemap.xml');
+        sitemapHint.classList.add('d-none');
+    });
+
+    document.getElementById('sitemapHintAppendIndex').addEventListener('click', function(e) {
+        e.preventDefault();
+        sitemapInput.value = sitemapInput.value.replace(/\/?$/, '/sitemap_index.xml');
+        sitemapHint.classList.add('d-none');
+    });
+
+    document.getElementById('tryExampleBtn').addEventListener('click', function(e) {
+        e.preventDefault();
+        document.getElementById('sitemapUrl').value = 'https://healymarketinggroup.com/sitemap.xml';
+        document.getElementById('searchString').value = 'campaign';
+    });
+
     document.getElementById('scanForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
